@@ -1,5 +1,5 @@
 const channelToken = '';
-var sheetId = '';
+const sheetId = '';
 const textType = ['いつ', 'だれ', 'どこ', '動詞ます'];
 const textArr = [
   ['今（いま）', '朝（あさ）', '昼（ひる）', '夜（よる）', 'あした', 'あさって', '今週（こんしゅう）', '来週（らいしゅう）', 'ことし', '来年（らいねん）'],
