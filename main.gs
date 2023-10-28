@@ -7,7 +7,7 @@ const textArr = [
   ['大学（だいがく）', '教室（きょうしつ）', '食堂（しょくどう）', '部屋（へや）', 'トイレ', '会社（かいしゃ）', '家（いえ）', '学校（がっこう）', 'スーパー', '駅（えき）'],
   ['日本語を勉強します（にほんごをべんきょうします）', 'ご飯を食べます（ごはんをたべます）', 'コーヒーを飲みます（のみます）', '映画を見ます（えいがをみます）', '本を読みます（ほんをよみます）', '手紙を書きます（てがみをかきます）', 'りんごを買います（かいます）', '写真を撮ります（しゃしんをとります）', '宿題をします（しゅくだいをします）', 'テニスをします']
 ]
-const textBetweenSentence = ['', 'と', 'で', '。'];
+const textBetweenSentence = ['', '', 'と', 'で', '。'];
 
 // 將選項組合成 flex message
 function fillJson(textArr, textType) {
@@ -80,14 +80,25 @@ function replyMsg(userId, userMessage) {
   // 開始時則初始化所有資料
   if (userMessage.includes('開始')) {
     status = 0;
-    sentence = ''
+    sentence = textBetweenSentence[0];
   }
   // 亂輸入文字時
   else if (status === 0) {
-    return {
+    return [{
       'type': 'text',
-      'text': '請輸入開始以開始'
-    };
+      'text': '請輸入開始以開始',
+      "quickReply": {
+        "items": [{
+          "type": "action",
+          "action": {
+            "type": "message",
+            "label": "開始",
+            "text": "開始"
+          }
+        }
+        ]
+      }
+    }];
   }
 
   let replyJson = [];
@@ -108,7 +119,7 @@ function replyMsg(userId, userMessage) {
   else {
     // 回傳現階段組合的句子內容
     if (status !== 0) {
-      sentence += userMessage + textBetweenSentence[status - 1];
+      sentence += userMessage + textBetweenSentence[status];
       replyJson.push(
         {
           'type': 'text',
