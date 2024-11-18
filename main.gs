@@ -1,13 +1,5 @@
 const channelToken = '';
 const sheetId = '';
-const textType = ['いつ', 'だれ', 'どこ', '動詞ます'];
-const textArr = [
-  ['今（いま）', '朝（あさ）', '昼（ひる）', '夜（よる）', 'あした', 'あさって', '今週（こんしゅう）', '来週（らいしゅう）', 'ことし', '来年（らいねん）'],
-  ['家族（かぞく）', '父（ちち）', '母（はは）', '兄（あに）', '姉（あね）', '弟（おとうと）', '妹（いもうと）', '友達（ともだち）', '恋人（こいびと）', 'ジョンさん'],
-  ['大学（だいがく）', '教室（きょうしつ）', '食堂（しょくどう）', '部屋（へや）', 'トイレ', '会社（かいしゃ）', '家（いえ）', '学校（がっこう）', 'スーパー', '駅（えき）'],
-  ['日本語を勉強します（にほんごをべんきょうします）', 'ご飯を食べます（ごはんをたべます）', 'コーヒーを飲みます（のみます）', '映画を見ます（えいがをみます）', '本を読みます（ほんをよみます）', '手紙を書きます（てがみをかきます）', 'りんごを買います（かいます）', '写真を撮ります（しゃしんをとります）', '宿題をします（しゅくだいをします）', 'テニスをします']
-]
-const textBetweenSentence = ['', '', 'と', 'で', '。'];
 
 // 將選項組合成 flex message
 function fillJson(textArr, textType) {
@@ -46,7 +38,8 @@ function fillJson(textArr, textType) {
             'text': textArr[i + j],
           },
           "color": "#d4e3fc",
-          "style": "secondary"
+          "style": "secondary",
+          "adjustMode": "shrink-to-fit"
         }
       )
     }
@@ -54,55 +47,103 @@ function fillJson(textArr, textType) {
   return replyJson;
 }
 
+function findSheetIndexByValue(value, sheet, lastRow, idColumn) {
+  for (let i = 2; i <= lastRow; i++) {
+    let sheetValue = sheet.getRange(i, idColumn).getValue();
+    if (value === sheetValue) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function getAllSentenceType() {
+  let SpreadSheet = SpreadsheetApp.openById(sheetId);
+  let SentenceSheet = SpreadSheet.getSheetByName('句型');
+  let SentenceLastRow = SentenceSheet.getLastRow();
+  let sentenceTypeArr = SentenceSheet.getRange(2, 1, SentenceLastRow - 1, 1).getValues().flat();
+  return sentenceTypeArr;
+}
+
+function sliceAllSentenceType(allSentenceType, limit) {
+  // 超過60個句型時換另一個flex message
+  let replyJson = [];
+  for (let i = 0; i < allSentenceType.length; i += limit) {
+    let sentenceTypeChunk = allSentenceType.slice(i, i + limit);
+    let pageText = (allSentenceType.length > limit) ? (i / limit + 1).toString() : '';
+    replyJson.push({
+      'type': 'flex',
+      'altText': `所有句型${pageText}`,
+      'contents': fillJson(sentenceTypeChunk, `句型選項${pageText}`)
+    })
+  }
+  return replyJson;
+}
+
 function replyMsg(userId, userMessage) {
   let SpreadSheet = SpreadsheetApp.openById(sheetId);
-  let Sheet = SpreadSheet.getSheetByName('工作表1');
-  let LastRow = Sheet.getLastRow();
+  let UserSheet = SpreadSheet.getSheetByName('user');
+  let UserLastRow = UserSheet.getLastRow();
+  let SentenceSheet = SpreadSheet.getSheetByName('句型');
+  let SentenceLastCol = SentenceSheet.getLastColumn();
   let status = 0;
+  let sentenceType = 0;
   let sentence = '';
+  let replyJson = [];
 
   // 尋找使用者資料
-  let foundIndex = -1;
-  for (var i = 2; i <= LastRow; i++) {
-    let sheetUserId = Sheet.getRange(i, 1).getValue();
-    if (userId === sheetUserId) {
-      [status, sentence] = Sheet.getRange(i, 2, 1, 2).getValues()[0];
-      foundIndex = i;
+  let userIndex = findSheetIndexByValue(userId, UserSheet, UserLastRow, 1);
+
+  // 找到使用者，取得各種資訊
+  if (userIndex !== -1) {
+    [sentenceType, status, sentence] = UserSheet.getRange(userIndex, 2, 1, 3).getValues()[0];
+  }
+  // 未找到使用者，則新增一筆資料
+  else {
+    UserSheet.getRange(UserLastRow + 1, 1, 1, 4).setValues([[userId, 0, 0, '']]);
+    userIndex = UserLastRow + 1;
+  }
+
+  // 重玩時則初始化所有資料
+  if (userMessage.includes('再來一次')) {
+    status = 0;
+    sentenceType = 0;
+    sentence = '';
+    UserSheet.getRange(userIndex, 2, 1, 3).setValues([[sentenceType, status, sentence]]);
+  }
+
+  // 還沒進行句型選擇時
+  if (sentenceType === 0) {
+    let allSentenceType = getAllSentenceType();
+    let sentenceTypeIndex = allSentenceType.indexOf(userMessage);
+    // 亂輸入 or 再來一次時顯示所有句型選單
+    if (sentenceTypeIndex === -1) {
+      replyJson.push({
+        'type': 'text',
+        'text': '請選擇句型'
+      });
+      replyJson = replyJson.concat(sliceAllSentenceType(allSentenceType, 60));
+      return replyJson;
+    }
+    // 設定句型
+    else {
+      sentenceType = sentenceTypeIndex + 2;
     }
   }
 
-  // 未找到使用者，則新增一筆資料
-  if (foundIndex === -1) {
-    Sheet.getRange(LastRow + 1, 1, 1, 3).setValues([[userId, 0, '']])
-    foundIndex = LastRow + 1;
+  // 句型處理
+  let sentenceRow = SentenceSheet.getRange(sentenceType, 2, 1, SentenceLastCol).getValues()[0];
+  let sentenceRowLastIndex = sentenceRow.findLastIndex((element) => element !== '');
+  let textTypeArr = [];
+  let textOptionArr = [];
+  let textBetweenSentenceArr = [sentenceRow[0]];
+  for (let i = 1; i<= sentenceRowLastIndex; i += 3){
+    textTypeArr.push(sentenceRow[i]);
+    textOptionArr.push(sentenceRow[i + 1].split(/[@＠]/));
+    textBetweenSentenceArr.push(sentenceRow[i + 2]);
   }
 
-  // 開始時則初始化所有資料
-  if (userMessage.includes('開始')) {
-    status = 0;
-    sentence = textBetweenSentence[0];
-  }
-  // 亂輸入文字時
-  else if (status === 0) {
-    return [{
-      'type': 'text',
-      'text': '請輸入開始以開始',
-      "quickReply": {
-        "items": [{
-          "type": "action",
-          "action": {
-            "type": "message",
-            "label": "開始",
-            "text": "開始"
-          }
-        }
-        ]
-      }
-    }];
-  }
-
-  let replyJson = [];
-  if (status !== 0 && textArr[status - 1].indexOf(userMessage) === -1) {
+  if (status !== 0 && textOptionArr[status - 1].indexOf(userMessage) === -1) {
     // 非目前狀態之選項內文字，要請使用者重新輸入
     replyJson.push(
       {
@@ -111,15 +152,19 @@ function replyMsg(userId, userMessage) {
       },
       {
         'type': 'flex',
-        'altText': textType[status - 1],
-        'contents': fillJson(textArr[status - 1], textType[status - 1])
+        'altText': textTypeArr[status - 1],
+        'contents': fillJson(textOptionArr[status - 1], textTypeArr[status - 1])
       }
     );
   }
   else {
+    // 加上句首
+    if (status === 0) {
+      sentence = textBetweenSentenceArr[0];
+    }
     // 回傳現階段組合的句子內容
-    if (status !== 0) {
-      sentence += userMessage + textBetweenSentence[status];
+    else {
+      sentence += userMessage + textBetweenSentenceArr[status];
       replyJson.push(
         {
           'type': 'text',
@@ -129,19 +174,20 @@ function replyMsg(userId, userMessage) {
     }
 
     // 組完句子時初始化並提示使用者重新遊玩
-    if (status === textArr.length) {
+    if (status === textOptionArr.length) {
+      sentenceType = 0;
       status = 0;
       sentence = '';
       replyJson.push({
         'type': 'text',
-        'text': '恭喜完成句子，歡迎再次按下開始按鈕重新遊玩!',
+        'text': '恭喜完成句子，歡迎再次按下再玩一次按鈕重新遊玩!',
         "quickReply": {
           "items": [{
             "type": "action",
             "action": {
               "type": "message",
-              "label": "開始",
-              "text": "開始"
+              "label": "再玩一次",
+              "text": "再玩一次"
             }
           }
           ]
@@ -153,23 +199,23 @@ function replyMsg(userId, userMessage) {
       replyJson.push(
         {
           'type': 'flex',
-          'altText': textType[status],
-          'contents': fillJson(textArr[status], textType[status])
+          'altText': textTypeArr[status],
+          'contents': fillJson(textOptionArr[status], textTypeArr[status])
         });
       status++;
     }
   }
 
   // 將目前狀態與句子寫入檔案
-  Sheet.getRange(foundIndex, 2, 1, 2).setValues([[status, sentence]]);
+  UserSheet.getRange(userIndex, 2, 1, 3).setValues([[sentenceType, status, sentence]]);
 
   return replyJson;
 
 }
 
-// 打LINE的API
+// 打LINE的reply API
 function replyLine(channelToken, replyToken, messages) {
-  var url = 'https://api.line.me/v2/bot/message/reply';
+  let url = 'https://api.line.me/v2/bot/message/reply';
   UrlFetchApp.fetch(url, {
     'headers': {
       'Content-Type': 'application/json; charset=UTF-8',
@@ -196,25 +242,16 @@ function doPost(e) {
     if (typeof replyToken === 'undefined') {
       continue;
     }
-    // 加好友時傳送貼圖並加上quick reply bubble
+
+    // 加好友時傳送貼圖並傳送句型選項
     if (type === 'follow') {
+      let allSentenceType = getAllSentenceType();
       let message = [{
         'type': 'sticker',
         'packageId': '789',
-        'stickerId': '10855',
-        'quickReply': {
-          "items": [
-            {
-              'type': 'action',
-              'action': {
-                'type': 'message',
-                'label': '開始',
-                'text': '開始'
-              }
-            },
-          ]
-        }
-      }]
+        'stickerId': '10855'
+      }];
+      message = message.concat(sliceAllSentenceType(allSentenceType, 60));
       replyLine(channelToken, replyToken, message);
     }
     // 當使用者傳送文字時進行處理
