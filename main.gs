@@ -161,6 +161,12 @@ function replyMsg(userId, userMessage) {
     // 加上句首
     if (status === 0) {
       sentence = textBetweenSentenceArr[0];
+      // 顯示句型預覽
+      let sentencePreviewText = textTypeArr.map((e) => `[${e}]`).map((element, i) => [element, textBetweenSentenceArr[i + 1]]).flat().join(' ');
+      replyJson.push({
+        'type': 'text',
+        'text': `句型預覽: ${(textBetweenSentenceArr[0] ? textBetweenSentenceArr[0] + ' ': '') + sentencePreviewText}`,
+      })
     }
     // 回傳現階段組合的句子內容
     else {
