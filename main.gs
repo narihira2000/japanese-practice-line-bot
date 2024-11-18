@@ -229,6 +229,22 @@ function replyLine(channelToken, replyToken, messages) {
   });
 }
 
+// 打LINE的loading API
+function loadingLine(channelToken, userId, duration) {
+  let url = 'https://api.line.me/v2/bot/chat/loading/start';
+  UrlFetchApp.fetch(url, {
+    'headers': {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'Authorization': 'Bearer ' + channelToken,
+    },
+    'method': 'post',
+    'payload': JSON.stringify({
+      'chatId': userId,
+      'loadingSeconds': duration
+    }),
+  })
+}
+
 
 function doPost(e) {
   let msg = JSON.parse(e.postData.contents);
@@ -245,6 +261,7 @@ function doPost(e) {
 
     // 加好友時傳送貼圖並傳送句型選項
     if (type === 'follow') {
+      loadingLine(channelToken, userId, 10);
       let allSentenceType = getAllSentenceType();
       let message = [{
         'type': 'sticker',
@@ -256,6 +273,7 @@ function doPost(e) {
     }
     // 當使用者傳送文字時進行處理
     else if (type === 'message') {
+      loadingLine(channelToken, userId, 10);
       let userMessage = msg.events[i].message.text;
       let message = replyMsg(userId, userMessage);
       replyLine(channelToken, replyToken, message);
