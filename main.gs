@@ -105,7 +105,7 @@ function replyMsg(userId, userMessage) {
   }
 
   // 重玩時則初始化所有資料
-  if (userMessage.includes('再來一次')) {
+  if (userMessage.includes('再玩一次')) {
     status = 0;
     sentenceType = 0;
     sentence = '';
